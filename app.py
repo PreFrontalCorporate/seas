@@ -61,12 +61,10 @@ def protected_route():
 
 @app.route('/login')
 def login():
-    auth0 = Auth0(domain="dev-7sz8prkr8rp6t8mx.us.auth0.com")
     return redirect(auth0.authorize(callback=url_for('authorized', _external=True)))
 
 @app.route('/login/callback')
 def authorized():
-    auth0 = Auth0(domain="dev-7sz8prkr8rp6t8mx.us.auth0.com")
     response = auth0.authorized_response()
     if response is None or response.get('access_token') is None:
         return 'Access denied: reason={} error={}'.format(
