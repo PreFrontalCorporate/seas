@@ -1,3 +1,5 @@
+import os
+import stripe
 from flask import Flask, jsonify, request, render_template, redirect, url_for, session
 from auth.middleware import token_required
 from auth.tokens import verify_token
@@ -9,6 +11,9 @@ from billing.webhooks import webhook_bp
 from usage.rate_limiter import rate_limit
 from billing.stripe_utils import create_checkout_session, check_payment_status, get_plan_details
 from auth0 import Auth0
+
+# Initialize Stripe with the secret key from environment variables
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
 # Initialize the Flask app
 def create_master_app():
@@ -24,11 +29,11 @@ def create_master_app():
     # Register error handlers
     @app.errorhandler(404)
     def not_found_error(error):
-        return render_template('error.html'), 404
+        return render_template('error.ejs'), 404
 
     @app.errorhandler(500)
     def internal_error(error):
-        return render_template('error.html'), 500
+        return render_template('error.ejs'), 500
 
     return app
 
@@ -60,7 +65,7 @@ def logout():
 @app.route('/store')
 def store():
     # Show pricing tiers and plans (hardcoded for now)
-    return render_template('store.html', plans=get_plan_details())
+    return render_template('store.ejs', plans=get_plan_details())
 
 # Usage Route for Monitoring API Usage
 @app.route('/usage')
@@ -69,7 +74,7 @@ def usage(decoded_token):
     # Get usage data based on decoded token (client_id)
     client_id = decoded_token['client_id']
     usage_data = get_usage(client_id)  # Fetch from database or external service
-    return render_template('usage.html', usage=usage_data)
+    return render_template('usage.ejs', usage=usage_data)
 
 # Billing Route to handle Stripe Checkout
 @app.route('/checkout', methods=['POST'])
@@ -106,7 +111,7 @@ def stripe_webhook():
     try:
         # Verify the webhook signature and process event
         event = stripe.Webhook.construct_event(
-            payload, sig_header, YOUR_STRIPE_SECRET_KEY
+            payload, sig_header, os.getenv('STRIPE_WEBHOOK_SECRET')
         )
 
     except ValueError as e:
