@@ -13,10 +13,8 @@ flask-cors
 requests
 pyjwt
 stripe
-redis
-SQLAlchemy
 psycopg2  # For PostgreSQL
 Flask-Login
 Flask-WTF
 Flask-Admin
-Flask-SQLAlchemy
+
