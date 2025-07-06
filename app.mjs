@@ -1,10 +1,11 @@
-const express = require('express');
-const session = require('express-session');
-const path = require('path');
-const fetch = require('node-fetch');
-const Auth0 = require('auth0');
-const Stripe = require('stripe');
-const dotenv = require('dotenv');
+import express from 'express';
+import session from 'express-session';
+import path from 'path';
+import fetch from 'node-fetch';  // Using ES Module import
+import Auth0 from 'auth0';
+import Stripe from 'stripe';
+import dotenv from 'dotenv';
+
 dotenv.config();
 
 const app = express();
