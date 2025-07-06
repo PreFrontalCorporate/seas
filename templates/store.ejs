@@ -11,44 +11,19 @@
         <h1 class="my-5 text-center">Choose Your Plan</h1>
         
         <div class="row">
-            <!-- Kolmogorov-Complexity Portfolio Explorer -->
+            <% plans.forEach(function(plan) { %>
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-body">
-                        <h5 class="card-title">Kolmogorov-Complexity Portfolio Explorer</h5>
-                        <p class="card-text">Licensing Fee: $75,000/year</p>
-                        <p class="card-text">API Pricing: $500/month (up to 100,000 API calls)</p>
-                        <p class="card-text">Hourly Consulting: $300/hour</p>
-                        <button class="btn btn-primary" id="checkoutKolmogorov">Choose Plan</button>
+                        <h5 class="card-title"><%= plan.name %></h5>
+                        <p class="card-text">Licensing Fee: $<%= plan.price %>/year</p>
+                        <p class="card-text">API Pricing: $<%= plan.apiPrice %>/month</p>
+                        <p class="card-text">Hourly Consulting: $<%= plan.consultingRate %>/hour</p>
+                        <button class="btn btn-primary" id="checkout<%= plan.name.replace(/\s+/g, '') %>">Choose Plan</button>
                     </div>
                 </div>
             </div>
-
-            <!-- CVaR Risk Estimation App -->
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">CVaR Risk Estimation App</h5>
-                        <p class="card-text">Licensing Fee: $50,000/year</p>
-                        <p class="card-text">API Pricing: $400/month (up to 75,000 API calls)</p>
-                        <p class="card-text">Hourly Consulting: $275/hour</p>
-                        <button class="btn btn-primary" id="checkoutCVaR">Choose Plan</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Wasserstein-Robust Portfolio Optimizer -->
-            <div class="col-md-4">
-                <div class="card">
-                    <div class="card-body">
-                        <h5 class="card-title">Wasserstein-Robust Portfolio Optimizer</h5>
-                        <p class="card-text">Licensing Fee: $90,000/year</p>
-                        <p class="card-text">API Pricing: $600/month (up to 100,000 API calls)</p>
-                        <p class="card-text">Hourly Consulting: $375/hour</p>
-                        <button class="btn btn-primary" id="checkoutWasserstein">Choose Plan</button>
-                    </div>
-                </div>
-            </div>
+            <% }); %>
         </div>
 
         <!-- Bundle Offers Section -->
@@ -89,10 +64,11 @@
         const stripe = Stripe('<%= stripePublishableKey %>');  // Inject your Stripe publishable key
 
         // Handle checkout buttons
-        document.getElementById('checkoutKolmogorov').addEventListener('click', function() {
+        <% plans.forEach(function(plan) { %>
+        document.getElementById('checkout<%= plan.name.replace(/\s+/g, '') %>').addEventListener('click', function() {
             fetch('/checkout', {
                 method: 'POST',
-                body: JSON.stringify({ plan: 'kolmogorov' }),
+                body: JSON.stringify({ plan: '<%= plan.name.toLowerCase().replace(/\s+/g, '') %>' }),
                 headers: { 'Content-Type': 'application/json' }
             }).then(response => response.json())
             .then(session => {
@@ -101,59 +77,7 @@
                 console.error("Error:", error);
             });
         });
-
-        // Handle other checkout buttons (CVaR, Wasserstein, etc.)
-        document.getElementById('checkoutCVaR').addEventListener('click', function() {
-            fetch('/checkout', {
-                method: 'POST',
-                body: JSON.stringify({ plan: 'cvar' }),
-                headers: { 'Content-Type': 'application/json' }
-            }).then(response => response.json())
-            .then(session => {
-                return stripe.redirectToCheckout({ sessionId: session.id });
-            }).catch(error => {
-                console.error("Error:", error);
-            });
-        });
-
-        document.getElementById('checkoutWasserstein').addEventListener('click', function() {
-            fetch('/checkout', {
-                method: 'POST',
-                body: JSON.stringify({ plan: 'wasserstein' }),
-                headers: { 'Content-Type': 'application/json' }
-            }).then(response => response.json())
-            .then(session => {
-                return stripe.redirectToCheckout({ sessionId: session.id });
-            }).catch(error => {
-                console.error("Error:", error);
-            });
-        });
-
-        document.getElementById('checkoutPremiumBundle').addEventListener('click', function() {
-            fetch('/checkout', {
-                method: 'POST',
-                body: JSON.stringify({ plan: 'premium_bundle' }),
-                headers: { 'Content-Type': 'application/json' }
-            }).then(response => response.json())
-            .then(session => {
-                return stripe.redirectToCheckout({ sessionId: session.id });
-            }).catch(error => {
-                console.error("Error:", error);
-            });
-        });
-
-        document.getElementById('checkoutRiskComplianceBundle').addEventListener('click', function() {
-            fetch('/checkout', {
-                method: 'POST',
-                body: JSON.stringify({ plan: 'risk_compliance_bundle' }),
-                headers: { 'Content-Type': 'application/json' }
-            }).then(response => response.json())
-            .then(session => {
-                return stripe.redirectToCheckout({ sessionId: session.id });
-            }).catch(error => {
-                console.error("Error:", error);
-            });
-        });
+        <% }); %>
     </script>
 </body>
 </html>
