@@ -16,7 +16,7 @@ const auth0Client = new AuthenticationClient({
     domain: process.env.AUTH0_DOMAIN,
     clientId: process.env.AUTH0_CLIENT_ID,
     clientSecret: process.env.AUTH0_CLIENT_SECRET,
-    redirectUri: `https://${process.env.AUTH0_DOMAIN}/callback`,  // Auth0 callback
+    redirectUri: `https://${process.env.BASE_URL}/callback`,  // Auth0 callback
 });
 
 // Use import.meta.url to resolve __dirname in ES Modules
