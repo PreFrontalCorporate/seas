@@ -29,7 +29,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Session middleware for maintaining login state
 app.use(session({
-    secret: process.env.SESSION_SECRET,  // Store the secret in .env
+    secret: process.env.SESSION_SECRET || 'default_secret_key',  // Store the secret in .env
     resave: false,
     saveUninitialized: true,
     cookie: {
