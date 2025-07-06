@@ -11,6 +11,10 @@ from billing.webhooks import webhook_bp
 from usage.rate_limiter import rate_limit
 from billing.stripe_utils import create_checkout_session, check_payment_status, get_plan_details
 from auth0 import Auth0
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Initialize Stripe with the secret key from environment variables
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
@@ -25,6 +29,11 @@ def create_master_app():
     app.register_blueprint(heavy_tail_bp, url_prefix="/heavy-tail")
     app.register_blueprint(kolmogorov_bp, url_prefix="/kolmogorov")
     app.register_blueprint(webhook_bp)  # For Stripe webhook handling
+
+    # Set Flask secret key and other configurations
+    app.config['SECRET_KEY'] = os.getenv('FLASK_APP_SECRET_KEY', 'default_secret_key')
+    app.config['DEBUG'] = False  # Disable debugging in production
+    app.config['ENV'] = 'production'  # Set environment to production
 
     # Register error handlers
     @app.errorhandler(404)
@@ -129,7 +138,7 @@ def stripe_webhook():
 
     return '', 200  # Stripe sends no response needed
 
-# Initialize the app and run
+# Initialize the app and run (for production)
 if __name__ == "__main__":
     app = create_master_app()
-    app.run(debug=True, host="0.0.0.0", port=8080)
+    app.run(debug=False, host="0.0.0.0", port=8080)

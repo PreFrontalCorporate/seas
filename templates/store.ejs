@@ -11,6 +11,7 @@
         <h1 class="my-5 text-center">Choose Your Plan</h1>
         
         <div class="row">
+            <!-- Kolmogorov-Complexity Portfolio Explorer -->
             <div class="col-md-4">
                 <div class="card">
                     <div class="card-body">
@@ -23,26 +24,136 @@
                 </div>
             </div>
 
-            <!-- Other Plans here -->
+            <!-- CVaR Risk Estimation App -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">CVaR Risk Estimation App</h5>
+                        <p class="card-text">Licensing Fee: $50,000/year</p>
+                        <p class="card-text">API Pricing: $400/month (up to 75,000 API calls)</p>
+                        <p class="card-text">Hourly Consulting: $275/hour</p>
+                        <button class="btn btn-primary" id="checkoutCVaR">Choose Plan</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Wasserstein-Robust Portfolio Optimizer -->
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Wasserstein-Robust Portfolio Optimizer</h5>
+                        <p class="card-text">Licensing Fee: $90,000/year</p>
+                        <p class="card-text">API Pricing: $600/month (up to 100,000 API calls)</p>
+                        <p class="card-text">Hourly Consulting: $375/hour</p>
+                        <button class="btn btn-primary" id="checkoutWasserstein">Choose Plan</button>
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <script src="https://js.stripe.com/v3/"></script>
-        <script>
-            const stripe = Stripe('<%= stripePublishableKey %>');  // Inject your Stripe publishable key
+        <!-- Bundle Offers Section -->
+        <h3 class="my-5 text-center">Discounted Bundle Offers</h3>
 
-            document.getElementById('checkoutKolmogorov').addEventListener('click', function() {
-                fetch('/checkout', {
-                    method: 'POST',
-                    body: JSON.stringify({ plan: 'kolmogorov' }),
-                    headers: { 'Content-Type': 'application/json' }
-                }).then(response => response.json())
-                .then(session => {
-                    return stripe.redirectToCheckout({ sessionId: session.id });
-                }).catch(error => {
-                    console.error("Error:", error);
-                });
-            });
-        </script>
+        <div class="row">
+            <!-- Premium Portfolio Management Bundle -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Premium Portfolio Management Suite</h5>
+                        <p class="card-text">Bundle Price: $450,000/year (Discounted from $530,000)</p>
+                        <p class="card-text">API Pricing: $2,000/month (up to 500,000 API calls)</p>
+                        <p class="card-text">Hourly Consulting: $1,000/hour</p>
+                        <button class="btn btn-warning" id="checkoutPremiumBundle">Choose Bundle</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Risk & Compliance Management Bundle -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Risk & Compliance Management Suite</h5>
+                        <p class="card-text">Bundle Price: $510,000/year (Discounted from $615,000)</p>
+                        <p class="card-text">API Pricing: $2,500/month (up to 500,000 API calls)</p>
+                        <p class="card-text">Hourly Consulting: $1,200/hour</p>
+                        <button class="btn btn-warning" id="checkoutRiskComplianceBundle">Choose Bundle</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+
+    <!-- Stripe Integration (for checkout sessions) -->
+    <script src="https://js.stripe.com/v3/"></script>
+    <script>
+        const stripe = Stripe('<%= stripePublishableKey %>');  // Inject your Stripe publishable key
+
+        // Handle checkout buttons
+        document.getElementById('checkoutKolmogorov').addEventListener('click', function() {
+            fetch('/checkout', {
+                method: 'POST',
+                body: JSON.stringify({ plan: 'kolmogorov' }),
+                headers: { 'Content-Type': 'application/json' }
+            }).then(response => response.json())
+            .then(session => {
+                return stripe.redirectToCheckout({ sessionId: session.id });
+            }).catch(error => {
+                console.error("Error:", error);
+            });
+        });
+
+        // Handle other checkout buttons (CVaR, Wasserstein, etc.)
+        document.getElementById('checkoutCVaR').addEventListener('click', function() {
+            fetch('/checkout', {
+                method: 'POST',
+                body: JSON.stringify({ plan: 'cvar' }),
+                headers: { 'Content-Type': 'application/json' }
+            }).then(response => response.json())
+            .then(session => {
+                return stripe.redirectToCheckout({ sessionId: session.id });
+            }).catch(error => {
+                console.error("Error:", error);
+            });
+        });
+
+        document.getElementById('checkoutWasserstein').addEventListener('click', function() {
+            fetch('/checkout', {
+                method: 'POST',
+                body: JSON.stringify({ plan: 'wasserstein' }),
+                headers: { 'Content-Type': 'application/json' }
+            }).then(response => response.json())
+            .then(session => {
+                return stripe.redirectToCheckout({ sessionId: session.id });
+            }).catch(error => {
+                console.error("Error:", error);
+            });
+        });
+
+        document.getElementById('checkoutPremiumBundle').addEventListener('click', function() {
+            fetch('/checkout', {
+                method: 'POST',
+                body: JSON.stringify({ plan: 'premium_bundle' }),
+                headers: { 'Content-Type': 'application/json' }
+            }).then(response => response.json())
+            .then(session => {
+                return stripe.redirectToCheckout({ sessionId: session.id });
+            }).catch(error => {
+                console.error("Error:", error);
+            });
+        });
+
+        document.getElementById('checkoutRiskComplianceBundle').addEventListener('click', function() {
+            fetch('/checkout', {
+                method: 'POST',
+                body: JSON.stringify({ plan: 'risk_compliance_bundle' }),
+                headers: { 'Content-Type': 'application/json' }
+            }).then(response => response.json())
+            .then(session => {
+                return stripe.redirectToCheckout({ sessionId: session.id });
+            }).catch(error => {
+                console.error("Error:", error);
+            });
+        });
+    </script>
 </body>
 </html>

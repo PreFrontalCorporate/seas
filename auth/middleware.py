@@ -38,3 +38,19 @@ class Auth0Middleware:
             raise ValueError(f"Error validating token: {e}")
 
         return True
+
+    def token_required(self, f):
+        """
+        Decorator to ensure that a valid token is present and verified in the request header.
+        """
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            try:
+                # Attempt to verify the token in the request
+                self.verify_token(request)
+            except ValueError as e:
+                return {"message": f"Unauthorized: {str(e)}"}, 401
+
+            return f(*args, **kwargs)
+
+        return decorated_function
