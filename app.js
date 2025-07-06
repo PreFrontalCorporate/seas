@@ -14,7 +14,7 @@ const auth0 = new Auth0({
     domain: process.env.AUTH0_DOMAIN,
     clientID: process.env.AUTH0_CLIENT_ID,
     clientSecret: process.env.AUTH0_CLIENT_SECRET,
-    redirectUri: `https://${process.env.AUTH0_DOMAIN}/callback`,
+    redirectUri: `https://${process.env.AUTH0_DOMAIN}/callback`,  // Auth0 callback
     audience: `https://${process.env.AUTH0_DOMAIN}/api/v2/`
 });
 
@@ -24,9 +24,12 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Session middleware for maintaining login state
 app.use(session({
-    secret: 'your-session-secret',
+    secret: process.env.SESSION_SECRET,  // Store the secret in .env
     resave: false,
-    saveUninitialized: true
+    saveUninitialized: true,
+    cookie: {
+        secure: process.env.NODE_ENV === 'production' // Secure cookies in production
+    }
 }));
 
 // Routes
@@ -62,37 +65,40 @@ app.get('/callback', async (req, res) => {
 
         const tokenData = await tokenResponse.json();
         req.session.accessToken = tokenData.access_token;
-        res.redirect('/store');  // Redirect to store after login
+        res.redirect('/usage');  // Redirect to usage page after login
     } catch (err) {
         console.log(err);
         res.send('Error during Auth0 callback');
     }
 });
 
-// Logout route
+// Logout route - Clear session and redirect to Auth0 logout
 app.get('/logout', (req, res) => {
     req.session.destroy((err) => {
-        res.redirect('https://dev-7sz8prkr8rp6t8mx.us.auth0.com/v2/logout?returnTo=https://cbb.homes');  // Redirect to Auth0 logout URL
+        res.redirect(`https://${process.env.AUTH0_DOMAIN}/v2/logout?returnTo=https://cbb.homes`);
     });
 });
 
-// Store page
-app.get('/store', (req, res) => {
-    // Render the store page with EJS and inject necessary variables like plans
-    res.render('store', { stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY });
-});
-
-// Usage page
+// Usage page - Display the user's API usage after login
 app.get('/usage', async (req, res) => {
-    const planDetails = await getPlanDetails(req.session.accessToken);  // Use token to get user plan details
-    res.render('usage', { 
-        planName: planDetails.planName, 
-        currentCalls: planDetails.currentCalls, 
-        apiLimit: planDetails.apiLimit 
-    });
+    if (!req.session.accessToken) {
+        return res.redirect('/login');  // Ensure the user is logged in
+    }
+
+    try {
+        const planDetails = await getPlanDetails(req.session.accessToken);  // Fetch user plan details using the access token
+        res.render('usage', {
+            planName: planDetails.planName,
+            currentCalls: planDetails.currentCalls,
+            apiLimit: planDetails.apiLimit
+        });
+    } catch (error) {
+        console.error(error);
+        res.send('Error fetching plan details');
+    }
 });
 
-// Stripe Checkout session creation
+// Stripe Checkout session creation route
 app.post('/checkout', async (req, res) => {
     const { plan } = req.body;
     try {
