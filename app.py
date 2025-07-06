@@ -1,5 +1,6 @@
 import os
 import stripe
+import redis
 from flask import Flask, jsonify, request, render_template, redirect, url_for, session
 from auth.middleware import Auth0Middleware
 from cvar_app.app.main import cvar_bp
@@ -16,6 +17,13 @@ load_dotenv()
 
 # Initialize Stripe with the secret key from environment variables
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+
+# Initialize Redis connection
+redis_host = os.getenv('REDIS_HOST', 'localhost')
+redis_port = os.getenv('REDIS_PORT', 6379)
+redis_db = os.getenv('REDIS_DB', 0)
+
+r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
 
 # Initialize the Flask app
 def create_master_app():
@@ -129,6 +137,21 @@ def stripe_webhook():
         handle_checkout_session(session)
 
     return '', 200
+
+@app.route('/')
+def index():
+    # Cache some data in Redis
+    cached_value = r.get('some_key')
+    if not cached_value:
+        cached_value = 'Hello from Redis!'
+        r.set('some_key', cached_value, ex=300)  # Cache for 5 minutes
+    return jsonify(message=cached_value)
+
+@app.route('/set_cache', methods=['POST'])
+def set_cache():
+    data = request.json
+    r.set(data['key'], data['value'], ex=300)  # Cache for 5 minutes
+    return jsonify(message="Data cached successfully")
 
 if __name__ == "__main__":
     app.run(debug=False, host="0.0.0.0", port=8080)
