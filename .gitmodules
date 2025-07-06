@@ -1,0 +1,12 @@
+[submodule "cvar_app"]
+	path = cvar_app
+	url = https://github.com/PreFrontalCorporate/CVaR-Risk-Estimation-App.git
+[submodule "wasserstein_app"]
+	path = wasserstein_app
+	url = https://github.com/PreFrontalCorporate/Wasserstein-Robust-Portfolio-Optimizer.git
+[submodule "heavy_tail_app"]
+	path = heavy_tail_app
+	url = https://github.com/PreFrontalCorporate/Heavy-Tail-Volatility-Simulator.git
+[submodule "kolmogorov_app"]
+	path = kolmogorov_app
+	url = https://github.com/PreFrontalCorporate/Kolmogorov-Complexity-Portfolio-Explorer.git
