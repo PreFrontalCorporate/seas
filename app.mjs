@@ -39,6 +39,17 @@ app.use(session({
 
 // Routes
 
+// Landing page - Home route with a big Login button
+app.get('/', (req, res) => {
+    res.render('landing', {
+        imagePath: '/images/seas_logo.png',  // Path to the image you uploaded
+        title: "Welcome to SEAS",
+        subtitle: "Your gateway to seamless API and cloud management",
+        buttonText: "Login",
+        loginUrl: "/login"
+    });
+});
+
 // Login route - redirect to Auth0
 app.get('/login', (req, res) => {
     const authUrl = `https://${process.env.AUTH0_DOMAIN}/authorize?client_id=${process.env.AUTH0_CLIENT_ID}&response_type=code&redirect_uri=${process.env.BASE_URL}/callback`;
@@ -138,7 +149,7 @@ app.post('/checkout', async (req, res) => {
     }
 });
 
-// Error handling page
+// Error handling page for 404
 app.use((req, res, next) => {
     console.log(`Request to ${req.url} not found`);  // Log the request that resulted in a 404
     res.status(404).render('error');

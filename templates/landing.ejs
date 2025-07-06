@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title><%= title %></title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+    <style>
+        .landing-container {
+            text-align: center;
+            margin-top: 100px;
+        }
+        .btn-login {
+            font-size: 20px;
+            padding: 15px 30px;
+        }
+        .product-image {
+            width: 100%;
+            max-width: 400px;
+            margin-top: 30px;
+        }
+    </style>
+</head>
+<body>
+    <div class="landing-container">
+        <h1><%= title %></h1>
+        <p><%= subtitle %></p>
+        <img src="<%= imagePath %>" alt="SEAS Product" class="product-image">
+        <br>
+        <a href="<%= loginUrl %>" class="btn btn-primary btn-login"><%= buttonText %></a>
+    </div>
+</body>
+</html>
