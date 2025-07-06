@@ -2,58 +2,48 @@ import mysql.connector
 import time
 from flask import current_app
 
-def get_db_connection():
+def get_db():
     """
-    Establish a connection to Google Cloud SQL database.
+    Connect to the database using configuration from the app.
     """
-    connection = mysql.connector.connect(
-        host=current_app.config['DB_HOST'],
-        user=current_app.config['DB_USER'],
-        password=current_app.config['DB_PASSWORD'],
-        database=current_app.config['DB_NAME']
-    )
-    return connection
+    if 'db' not in g:
+        g.db = mysql.connector.connect(
+            host=current_app.config['DB_HOST'],
+            user=current_app.config['DB_USER'],
+            password=current_app.config['DB_PASSWORD'],
+            database=current_app.config['DB_NAME']
+        )
+    return g.db
 
 def rate_limit(client_id, max_requests_per_minute):
     """
-    Implements a rate limit using Google Cloud SQL to track the number of requests per client.
+    Implements rate limiting using Google Cloud SQL (MySQL/PostgreSQL).
+    Tracks the number of requests per client.
     """
-    connection = get_db_connection()
-    cursor = connection.cursor()
-
     current_time = int(time.time())
     time_window = current_time // 60  # Minute granularity
     key = f"rate_limit:{client_id}:{time_window}"
 
-    # Check if the client exceeded the limit
-    cursor.execute("""
-        SELECT requests FROM client_usage 
-        WHERE client_id = %s AND timestamp = %s
-    """, (client_id, time_window))
-    result = cursor.fetchone()
+    # Get DB connection
+    db = get_db()
+    cursor = db.cursor()
 
-    if result:
-        # Client exists, check requests count
-        requests = result[0]
+    # Check if the client has exceeded the limit in the database
+    cursor.execute("SELECT count FROM rate_limits WHERE client_id = %s AND time_window = %s", (client_id, time_window))
+    row = cursor.fetchone()
+
+    if row:
+        requests = row[0]
         if requests >= max_requests_per_minute:
-            cursor.close()
-            connection.close()
             return False  # Limit exceeded
 
-        # Otherwise, increment the requests count
-        cursor.execute("""
-            UPDATE client_usage 
-            SET requests = requests + 1
-            WHERE client_id = %s AND timestamp = %s
-        """, (client_id, time_window))
+        # Increment request count
+        cursor.execute("UPDATE rate_limits SET count = count + 1 WHERE client_id = %s AND time_window = %s", (client_id, time_window))
     else:
-        # No existing record, create a new entry for this client and timestamp
-        cursor.execute("""
-            INSERT INTO client_usage (client_id, timestamp, requests)
-            VALUES (%s, %s, %s)
-        """, (client_id, time_window, 1))
+        # Insert a new row if client doesn't exist for this time window
+        cursor.execute("INSERT INTO rate_limits (client_id, time_window, count) VALUES (%s, %s, 1)", (client_id, time_window))
 
-    connection.commit()
-    cursor.close()
-    connection.close()
+    # Commit the transaction
+    db.commit()
+
     return True
