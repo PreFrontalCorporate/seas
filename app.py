@@ -1,7 +1,7 @@
 import os
 import stripe
 from flask import Flask, jsonify, request, render_template, redirect, url_for, session
-from auth.middleware import Auth0Middleware  # Make sure this import points to the correct middleware
+from auth.middleware import Auth0Middleware
 from cvar_app.app.main import cvar_bp
 from wasserstein_app.app import wasserstein_bp
 from heavy_tail_app.app import heavy_tail_bp
@@ -32,6 +32,8 @@ def create_master_app():
     app.config['SECRET_KEY'] = os.getenv('FLASK_APP_SECRET_KEY', 'default_secret_key')
     app.config['DEBUG'] = False  # Disable debugging in production
     app.config['ENV'] = 'production'  # Set environment to production
+    app.config['STRIPE_SECRET_KEY'] = os.getenv('STRIPE_SECRET_KEY')
+    app.config['STRIPE_WEBHOOK_SECRET'] = os.getenv('STRIPE_WEBHOOK_SECRET')
 
     # Register error handlers
     @app.errorhandler(404)
