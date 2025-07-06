@@ -2,7 +2,7 @@ import express from 'express';
 import session from 'express-session';
 import path from 'path';
 import fetch from 'node-fetch';  // Using ES Module import
-import Auth0 from 'auth0';
+import { Auth0Client } from 'auth0';  // Correct import for Auth0
 import Stripe from 'stripe';
 import dotenv from 'dotenv';
 
@@ -11,10 +11,11 @@ dotenv.config();
 const app = express();
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);  // Your Stripe secret key
 
-const auth0 = new Auth0({
+// Initialize Auth0Client
+const auth0 = new Auth0Client({
     domain: process.env.AUTH0_DOMAIN,
-    clientID: process.env.AUTH0_CLIENT_ID,
-    clientSecret: process.env.AUTH0_CLIENT_SECRET,
+    client_id: process.env.AUTH0_CLIENT_ID,
+    client_secret: process.env.AUTH0_CLIENT_SECRET,
     redirectUri: `https://${process.env.AUTH0_DOMAIN}/callback`,  // Auth0 callback
     audience: `https://${process.env.AUTH0_DOMAIN}/api/v2/`
 });
