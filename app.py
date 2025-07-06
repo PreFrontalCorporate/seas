@@ -51,6 +51,9 @@ auth0 = Auth0Middleware(domain="dev-7sz8prkr8rp6t8mx.us.auth0.com",
                         client_id=os.getenv('AUTH0_CLIENT_ID'), 
                         client_secret=os.getenv('AUTH0_CLIENT_SECRET'))
 
+# Ensure `app` is initialized before defining routes
+app = create_master_app()
+
 @app.route('/protected')
 @auth0.token_required
 def protected_route():
@@ -130,5 +133,4 @@ def stripe_webhook():
     return '', 200
 
 if __name__ == "__main__":
-    app = create_master_app()
     app.run(debug=False, host="0.0.0.0", port=8080)
