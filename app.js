@@ -1,0 +1,134 @@
+const express = require('express');
+const session = require('express-session');
+const path = require('path');
+const fetch = require('node-fetch');
+const Auth0 = require('auth0');
+const Stripe = require('stripe');
+const dotenv = require('dotenv');
+dotenv.config();
+
+const app = express();
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);  // Your Stripe secret key
+
+const auth0 = new Auth0({
+    domain: process.env.AUTH0_DOMAIN,
+    clientID: process.env.AUTH0_CLIENT_ID,
+    clientSecret: process.env.AUTH0_CLIENT_SECRET,
+    redirectUri: `https://${process.env.AUTH0_DOMAIN}/callback`,
+    audience: `https://${process.env.AUTH0_DOMAIN}/api/v2/`
+});
+
+app.set('view engine', 'ejs');
+app.use(express.json());
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Session middleware for maintaining login state
+app.use(session({
+    secret: 'your-session-secret',
+    resave: false,
+    saveUninitialized: true
+}));
+
+// Routes
+
+// Login route - redirect to Auth0
+app.get('/login', (req, res) => {
+    const authUrl = `https://${process.env.AUTH0_DOMAIN}/authorize?client_id=${process.env.AUTH0_CLIENT_ID}&response_type=code&redirect_uri=${process.env.BASE_URL}/callback`;
+    res.redirect(authUrl);
+});
+
+// Auth0 Callback route - handle Auth0 callback after login
+app.get('/callback', async (req, res) => {
+    const { code } = req.query;
+
+    if (!code) {
+        return res.send("No authorization code received");
+    }
+
+    try {
+        const tokenResponse = await fetch(`https://${process.env.AUTH0_DOMAIN}/oauth/token`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                client_id: process.env.AUTH0_CLIENT_ID,
+                client_secret: process.env.AUTH0_CLIENT_SECRET,
+                code,
+                redirect_uri: `${process.env.BASE_URL}/callback`,
+                grant_type: 'authorization_code'
+            }),
+        });
+
+        const tokenData = await tokenResponse.json();
+        req.session.accessToken = tokenData.access_token;
+        res.redirect('/store');  // Redirect to store after login
+    } catch (err) {
+        console.log(err);
+        res.send('Error during Auth0 callback');
+    }
+});
+
+// Logout route
+app.get('/logout', (req, res) => {
+    req.session.destroy((err) => {
+        res.redirect('https://dev-7sz8prkr8rp6t8mx.us.auth0.com/v2/logout?returnTo=https://cbb.homes');  // Redirect to Auth0 logout URL
+    });
+});
+
+// Store page
+app.get('/store', (req, res) => {
+    // Render the store page with EJS and inject necessary variables like plans
+    res.render('store', { stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY });
+});
+
+// Usage page
+app.get('/usage', async (req, res) => {
+    const planDetails = await getPlanDetails(req.session.accessToken);  // Use token to get user plan details
+    res.render('usage', { 
+        planName: planDetails.planName, 
+        currentCalls: planDetails.currentCalls, 
+        apiLimit: planDetails.apiLimit 
+    });
+});
+
+// Stripe Checkout session creation
+app.post('/checkout', async (req, res) => {
+    const { plan } = req.body;
+    try {
+        const session = await stripe.checkout.sessions.create({
+            payment_method_types: ['card'],
+            line_items: [
+                {
+                    price_data: {
+                        currency: 'usd',
+                        product_data: {
+                            name: plan,
+                        },
+                        unit_amount: 1000,  // Adjust for your product's price
+                    },
+                    quantity: 1,
+                },
+            ],
+            mode: 'payment',
+            success_url: `${process.env.BASE_URL}/success?session_id={CHECKOUT_SESSION_ID}`,
+            cancel_url: `${process.env.BASE_URL}/cancel`,
+        });
+
+        res.json({ sessionId: session.id });
+    } catch (err) {
+        console.error(err);
+        res.status(500).send('Error creating checkout session');
+    }
+});
+
+// Error handling page
+app.use((req, res, next) => {
+    res.status(404).render('error');
+});
+
+// Start the server
+const port = process.env.PORT || 8080;
+app.listen(port, () => {
+    console.log(`Server is running on http://localhost:${port}`);
+});

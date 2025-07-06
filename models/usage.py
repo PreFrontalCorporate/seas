@@ -14,6 +14,6 @@ class UsageLog(Base):
     client_id = Column(Integer, ForeignKey('clients.id'))
     endpoint = Column(String)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow)
-    usage_cost = Column(Integer)  # Cost in credits
+    usage_cost = Column(Integer)
 
     client = relationship('Client')

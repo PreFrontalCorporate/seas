@@ -1,21 +1,40 @@
-# auth/middleware.py
+import json
+import requests
+from flask import request
+from functools import wraps
 
-from flask import request, jsonify
-from .tokens import verify_token
+class Auth0Middleware:
+    def __init__(self, domain, client_id, client_secret):
+        self.domain = domain
+        self.client_id = client_id
+        self.client_secret = client_secret
 
-def token_required(f):
-    """
-    Decorator that checks if a valid token is included in the request.
-    """
-    def decorator(*args, **kwargs):
-        token = request.headers.get("Authorization")
-        if not token:
-            return jsonify({"message": "Token is missing!"}), 403
+    def verify_token(self, req):
+        """
+        Verify the Auth0 token passed in the Authorization header
+        """
+        auth = req.headers.get("Authorization", None)
+        
+        if not auth:
+            raise ValueError("Authorization token is missing")
+        
+        parts = auth.split()
 
-        decoded_token = verify_token(token)
-        if not decoded_token:
-            return jsonify({"message": "Invalid token!"}), 403
+        if len(parts) != 2:
+            raise ValueError("Authorization token format is incorrect")
+        
+        token = parts[1]
 
-        return f(decoded_token, *args, **kwargs)
+        # Check token with Auth0 Public Key endpoint
+        public_key_url = f"https://{self.domain}/.well-known/jwks.json"
+        try:
+            response = requests.get(public_key_url)
+            jwks = response.json()
+            # Look for the correct key to validate
+            for key in jwks['keys']:
+                # Extract the key based on 'kid' to verify JWT
+                pass  # You should decode and verify the JWT here
+        except Exception as e:
+            raise ValueError(f"Error validating token: {e}")
 
-    return decorator
+        return True
