@@ -19,6 +19,9 @@ const auth0Client = new AuthenticationClient({
     redirectUri: `https://${process.env.AUTH0_DOMAIN}/callback`,  // Auth0 callback
 });
 
+// Use import.meta.url to resolve __dirname in ES Modules
+const __dirname = path.dirname(new URL(import.meta.url).pathname);
+
 // Set up the view engine and static file path
 app.set('view engine', 'ejs');
 app.use(express.json());
