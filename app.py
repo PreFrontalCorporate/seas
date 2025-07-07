@@ -13,7 +13,7 @@ from usage.rate_limiter import rate_limit
 from billing.stripe_utils import create_checkout_session, get_plan_details
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
 # Initialize Stripe
@@ -111,7 +111,10 @@ def store():
 def usage(decoded_token):
     client_id = decoded_token['client_id']
     usage_data = get_usage(client_id)  # Implement or update this
-    return render_template('usage.ejs', usage=usage_data)
+    secret = get_api_secret(client_id)
+    if not secret:
+        secret = generate_api_secret(client_id)
+    return render_template('usage.ejs', usage=usage_data, api_secret=secret)
 
 @app.route('/checkout', methods=['POST'])
 @auth0.token_required
@@ -172,8 +175,8 @@ def api_generate_secret(decoded_token):
 @auth0.token_required
 def api_regenerate_secret(decoded_token):
     user_id = decoded_token['client_id']
-    new_secret = regenerate_api_secret(user_id)
-    return jsonify({"message": "API secret regenerated.", "api_secret": new_secret})
+    regenerate_api_secret(user_id)
+    return redirect(url_for('usage'))
 
 @app.route('/api/validate_secret', methods=['POST'])
 @auth0.token_required

@@ -12,8 +12,8 @@
 
         <div class="row">
             <div class="col-md-12">
-                <h3>Current Plan: <span id="plan-name"><%= planName %></span></h3>
-                <p>API Calls: <span id="current-calls"><%= currentCalls %></span> out of <span id="plan-api-limit"><%= apiLimit %></span></p>
+                <h3>Current Plan: <span id="plan-name"><%= usage.planName %></span></h3>
+                <p>API Calls: <span id="current-calls"><%= usage.currentCalls %></span> out of <span id="plan-api-limit"><%= usage.apiLimit %></span></p>
                 <p><strong>Rate Limit:</strong> 60 requests per minute</p>
 
                 <h4>Actions:</h4>
@@ -21,8 +21,35 @@
                 <a href="/profile" class="btn btn-secondary ml-2">Profile</a>
                 <a href="/settings" class="btn btn-secondary ml-2">Settings</a>
                 <a href="/logout" class="btn btn-danger ml-2">Logout</a>
+
+                <hr>
+
+                <h3>Your API Secret</h3>
+                <p>
+                    <strong id="apiSecret"><%= api_secret %></strong>
+                    <button class="btn btn-outline-secondary btn-sm" onclick="copySecret()">Copy</button>
+                </p>
+
+                <form id="regenForm" method="POST" action="/api/regenerate_secret">
+                    <button type="submit" class="btn btn-warning btn-sm">Regenerate Secret</button>
+                </form>
+
+                <p class="mt-3">
+                    <em>⚠️ Keep your API secret safe! It uniquely identifies you and gives access to the APIs you've purchased.</em>
+                </p>
             </div>
         </div>
     </div>
+
+    <script>
+    function copySecret() {
+      const secretText = document.getElementById('apiSecret').innerText;
+      navigator.clipboard.writeText(secretText).then(() => {
+        alert('API Secret copied to clipboard!');
+      }, () => {
+        alert('Failed to copy. Please copy manually.');
+      });
+    }
+    </script>
 </body>
 </html>
