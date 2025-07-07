@@ -2,7 +2,7 @@ import os
 import stripe
 import redis
 import secrets
-from flask import Flask, jsonify, request, render_template, redirect, url_for, session
+from flask import Flask, jsonify, request, render_template, redirect, url_for, session, abort
 from auth.middleware import Auth0Middleware
 from cvar_app.app.main import cvar_bp
 from wasserstein_app.app import wasserstein_bp
@@ -76,42 +76,36 @@ def validate_api_secret(user_id, provided_secret):
     stored_secret = get_api_secret(user_id)
     return secrets.compare_digest(stored_secret or '', provided_secret)
 
-# New utility to verify permanent API key in sub-apps
-def verify_api_key():
+# Stronger API key check: abort on failure
+def verify_api_key_or_abort():
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
-        return None
+        abort(401, description="Missing or invalid Authorization header")
     api_secret = auth_header.split(' ')[1]
 
-    # Check all keys in Redis
     keys = r.keys('user:*:api_secret')
     for key in keys:
         stored = r.get(key)
         if stored == api_secret:
-            user_id = key.split(':')[1]
-            return user_id
-    return None
+            return key.split(':')[1]
+    abort(401, description="Invalid API key")
 
-# Example: protect an endpoint in each blueprint (repeat similar in each sub-app)
+# Enforce API key on sub-apps
 @cvar_bp.before_request
 def require_api_key_cvar():
-    if not verify_api_key():
-        return jsonify({"message": "Unauthorized"}), 401
+    verify_api_key_or_abort()
 
 @wasserstein_bp.before_request
 def require_api_key_wasserstein():
-    if not verify_api_key():
-        return jsonify({"message": "Unauthorized"}), 401
+    verify_api_key_or_abort()
 
 @heavy_tail_bp.before_request
 def require_api_key_heavy_tail():
-    if not verify_api_key():
-        return jsonify({"message": "Unauthorized"}), 401
+    verify_api_key_or_abort()
 
 @kolmogorov_bp.before_request
 def require_api_key_kolmogorov():
-    if not verify_api_key():
-        return jsonify({"message": "Unauthorized"}), 401
+    verify_api_key_or_abort()
 
 # Auth routes
 @app.route('/protected')
