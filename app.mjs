@@ -11,12 +11,24 @@ dotenv.config();
 const app = express();
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);  // Your Stripe secret key
 
+// Define the getPlanDetails function
+const getPlanDetails = async (accessToken) => {
+    // This is just a placeholder. Replace this with actual logic to fetch plan details.
+    return new Promise((resolve) => {
+        resolve({
+            planName: 'Basic Plan',
+            currentCalls: 50,
+            apiLimit: 100
+        });
+    });
+};
+
 // Initialize Auth0Client
 const auth0Client = new AuthenticationClient({
     domain: process.env.AUTH0_DOMAIN,
     clientId: process.env.AUTH0_CLIENT_ID,
     clientSecret: process.env.AUTH0_CLIENT_SECRET,
-    redirectUri: `https://${process.env.BASE_URL}/callback`,  // Auth0 callback
+    redirectUri: `${process.env.BASE_URL}/callback`,  // Auth0 callback
 });
 
 // Use import.meta.url to resolve __dirname in ES Modules
