@@ -1,6 +1,7 @@
 import os
 import stripe
 import redis
+import secrets
 from flask import Flask, jsonify, request, render_template, redirect, url_for, session
 from auth.middleware import Auth0Middleware
 from cvar_app.app.main import cvar_bp
@@ -15,35 +16,31 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
-# Initialize Stripe with the secret key from environment variables
+# Initialize Stripe
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
-# Initialize Redis connection
+# Initialize Redis
 redis_host = os.getenv('REDIS_HOST', 'localhost')
-redis_port = os.getenv('REDIS_PORT', 6379)
-redis_db = os.getenv('REDIS_DB', 0)
-
+redis_port = int(os.getenv('REDIS_PORT', 6379))
+redis_db = int(os.getenv('REDIS_DB', 0))
 r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
 
-# Initialize the Flask app
+# Initialize Flask app
 def create_master_app():
     app = Flask(__name__)
 
-    # Register blueprints from each sub-API
     app.register_blueprint(cvar_bp, url_prefix="/cvar")
     app.register_blueprint(wasserstein_bp, url_prefix="/wasserstein")
     app.register_blueprint(heavy_tail_bp, url_prefix="/heavy-tail")
     app.register_blueprint(kolmogorov_bp, url_prefix="/kolmogorov")
-    app.register_blueprint(webhook_bp)  # For Stripe webhook handling
+    app.register_blueprint(webhook_bp)
 
-    # Set Flask secret key and other configurations
     app.config['SECRET_KEY'] = os.getenv('FLASK_APP_SECRET_KEY', 'default_secret_key')
-    app.config['DEBUG'] = False  # Disable debugging in production
-    app.config['ENV'] = 'production'  # Set environment to production
+    app.config['DEBUG'] = False
+    app.config['ENV'] = 'production'
     app.config['STRIPE_SECRET_KEY'] = os.getenv('STRIPE_SECRET_KEY')
     app.config['STRIPE_WEBHOOK_SECRET'] = os.getenv('STRIPE_WEBHOOK_SECRET')
 
-    # Register error handlers
     @app.errorhandler(404)
     def not_found_error(error):
         return render_template('error.ejs'), 404
@@ -54,14 +51,32 @@ def create_master_app():
 
     return app
 
-# Auth0 Middleware Initialization
+# Auth0 Middleware
 auth0 = Auth0Middleware(domain="dev-7sz8prkr8rp6t8mx.us.auth0.com", 
                         client_id=os.getenv('AUTH0_CLIENT_ID'), 
                         client_secret=os.getenv('AUTH0_CLIENT_SECRET'))
 
-# Ensure `app` is initialized before defining routes
 app = create_master_app()
 
+# Utility functions for API secrets
+def generate_api_secret(user_id):
+    secret = secrets.token_urlsafe(32)
+    redis_key = f"user:{user_id}:api_secret"
+    r.set(redis_key, secret)
+    return secret
+
+def get_api_secret(user_id):
+    redis_key = f"user:{user_id}:api_secret"
+    return r.get(redis_key)
+
+def regenerate_api_secret(user_id):
+    return generate_api_secret(user_id)
+
+def validate_api_secret(user_id, provided_secret):
+    stored_secret = get_api_secret(user_id)
+    return secrets.compare_digest(stored_secret or '', provided_secret)
+
+# Auth routes
 @app.route('/protected')
 @auth0.token_required
 def protected_route():
@@ -79,7 +94,6 @@ def authorized():
             request.args['error_reason'],
             request.args['error_description']
         )
-
     session['auth_token'] = response['access_token']
     return redirect(url_for('index'))
 
@@ -96,62 +110,81 @@ def store():
 @auth0.token_required
 def usage(decoded_token):
     client_id = decoded_token['client_id']
-    usage_data = get_usage(client_id)  # Fetch from database or external service
+    usage_data = get_usage(client_id)  # Implement or update this
     return render_template('usage.ejs', usage=usage_data)
 
 @app.route('/checkout', methods=['POST'])
 @auth0.token_required
 def checkout(decoded_token):
     client_id = decoded_token['client_id']
-    plan = request.json.get('plan')  # E.g., 'cvar_basic'
-    session = create_checkout_session(client_id, plan)  # Create session with Stripe
+    plan = request.json.get('plan')
+    session = create_checkout_session(client_id, plan)
     return jsonify({'checkout_url': session.url})
 
 @app.route("/api/some_endpoint", methods=["POST"])
 @auth0.token_required
 def some_api_route(decoded_token):
     client_id = decoded_token['client_id']
-
     if not rate_limit(client_id, max_requests_per_minute=60):
         return {"message": "Rate limit exceeded"}, 429
-
     return {"message": "Success!"}
 
 @app.route('/webhook', methods=['POST'])
 def stripe_webhook():
     payload = request.get_data(as_text=True)
     sig_header = request.headers.get('Stripe-Signature')
-    event = None
-
     try:
-        event = stripe.Webhook.construct_event(
-            payload, sig_header, os.getenv('STRIPE_WEBHOOK_SECRET')
-        )
-    except ValueError as e:
+        event = stripe.Webhook.construct_event(payload, sig_header, os.getenv('STRIPE_WEBHOOK_SECRET'))
+    except ValueError:
         return 'Invalid payload', 400
-    except stripe.error.SignatureVerificationError as e:
+    except stripe.error.SignatureVerificationError:
         return 'Signature verification failed', 400
 
     if event['type'] == 'checkout.session.completed':
-        session = event['data']['object']
-        handle_checkout_session(session)
+        session_obj = event['data']['object']
+        handle_checkout_session(session_obj)  # You need to define this
 
     return '', 200
 
 @app.route('/')
 def index():
-    # Cache some data in Redis
     cached_value = r.get('some_key')
     if not cached_value:
         cached_value = 'Hello from Redis!'
-        r.set('some_key', cached_value, ex=300)  # Cache for 5 minutes
+        r.set('some_key', cached_value, ex=300)
     return jsonify(message=cached_value)
 
 @app.route('/set_cache', methods=['POST'])
 def set_cache():
     data = request.json
-    r.set(data['key'], data['value'], ex=300)  # Cache for 5 minutes
+    r.set(data['key'], data['value'], ex=300)
     return jsonify(message="Data cached successfully")
+
+# === API secret routes ===
+@app.route('/api/generate_secret', methods=['POST'])
+@auth0.token_required
+def api_generate_secret(decoded_token):
+    user_id = decoded_token['client_id']
+    new_secret = generate_api_secret(user_id)
+    return jsonify({"message": "API secret generated.", "api_secret": new_secret})
+
+@app.route('/api/regenerate_secret', methods=['POST'])
+@auth0.token_required
+def api_regenerate_secret(decoded_token):
+    user_id = decoded_token['client_id']
+    new_secret = regenerate_api_secret(user_id)
+    return jsonify({"message": "API secret regenerated.", "api_secret": new_secret})
+
+@app.route('/api/validate_secret', methods=['POST'])
+@auth0.token_required
+def api_validate_secret(decoded_token):
+    user_id = decoded_token['client_id']
+    data = request.json
+    provided_secret = data.get('api_secret')
+    if validate_api_secret(user_id, provided_secret):
+        return jsonify({"message": "Secret is valid!"})
+    else:
+        return jsonify({"message": "Invalid secret!"}), 401
 
 if __name__ == "__main__":
     app.run(debug=False, host="0.0.0.0", port=8080)
