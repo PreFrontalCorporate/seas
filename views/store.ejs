@@ -3,31 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Product Store</title>
+  <title>Store</title>
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
 </head>
 <body>
   <div class="container">
     <h1 class="my-5 text-center">Choose Your Plan</h1>
+    <p class="text-center">Select a new plan or bundle from the store!</p>
 
     <div class="row">
-      <% plans.forEach(function(plan) { %>
-      <div class="col-md-4">
-        <div class="card mb-4">
-          <div class="card-body">
-            <h5 class="card-title"><%= plan.name %></h5>
-            <p class="card-text">Licensing Fee: $<%= plan.price %>/year</p>
-            <p class="card-text">API Pricing: $<%= plan.apiPrice %>/month</p>
-            <p class="card-text">Hourly Consulting: $<%= plan.consultingRate %>/hour</p>
-            <button 
-              class="btn btn-primary checkout-btn" 
-              data-plan="<%= plan.name.toLowerCase().replace(/\s+/g, '') %>">
-              Choose Plan
-            </button>
+      <% if (plans && plans.length) { %>
+        <% plans.forEach(function(plan) { %>
+        <div class="col-md-4">
+          <div class="card mb-4">
+            <div class="card-body">
+              <h5 class="card-title"><%= plan.name %></h5>
+              <p class="card-text">Licensing Fee: $<%= plan.price %>/year</p>
+              <p class="card-text">API Pricing: $<%= plan.apiPrice %>/month</p>
+              <p class="card-text">Hourly Consulting: $<%= plan.consultingRate %>/hour</p>
+              <button 
+                class="btn btn-primary checkout-btn" 
+                data-plan="<%= plan.name.toLowerCase().replace(/\s+/g, '') %>">
+                Choose Plan
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-      <% }); %>
+        <% }); %>
+      <% } else { %>
+        <div class="col-12 text-center">
+          <p>No plans available at the moment.</p>
+        </div>
+      <% } %>
     </div>
 
     <!-- Bundle Offers Section -->
@@ -58,6 +65,8 @@
         </div>
       </div>
     </div>
+
+    <a href="/usage" class="btn btn-primary d-block mx-auto my-5">Back to Usage</a>
   </div>
 
   <!-- Stripe Integration -->
