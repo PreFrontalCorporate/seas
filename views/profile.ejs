@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Profile</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+</head>
+<body>
+    <div class="container">
+        <h1 class="my-5">Your Profile</h1>
+
+        <div class="row">
+            <div class="col-md-12">
+                <p><strong>Email:</strong> <%= userEmail %></p>
+                <p><strong>Plan:</strong> <%= planName %></p>
+                <p><strong>API Calls:</strong> <%= currentCalls %> out of <%= apiLimit %></p>
+
+                <a href="/settings" class="btn btn-secondary">Edit Settings</a>
+                <a href="/usage" class="btn btn-primary ml-3">Back to Usage</a>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Product Store</title>
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0/css/bootstrap.min.css">
+</head>
+<body>
+  <div class="container">
+    <h1 class="my-5 text-center">Choose Your Plan</h1>
+
+    <div class="row">
+      <% plans.forEach(function(plan) { %>
+      <div class="col-md-4">
+        <div class="card mb-4">
+          <div class="card-body">
+            <h5 class="card-title"><%= plan.name %></h5>
+            <p class="card-text">Licensing Fee: $<%= plan.price %>/year</p>
+            <p class="card-text">API Pricing: $<%= plan.apiPrice %>/month</p>
+            <p class="card-text">Hourly Consulting: $<%= plan.consultingRate %>/hour</p>
+            <button 
+              class="btn btn-primary checkout-btn" 
+              data-plan="<%= plan.name.toLowerCase().replace(/\s+/g, '') %>">
+              Choose Plan
+            </button>
+          </div>
+        </div>
+      </div>
+      <% }); %>
+    </div>
+
+    <!-- Bundle Offers Section -->
+    <h3 class="my-5 text-center">Discounted Bundle Offers</h3>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card mb-4">
+          <div class="card-body">
+            <h5 class="card-title">Premium Portfolio Management Suite</h5>
+            <p class="card-text">Bundle Price: $450,000/year (Discounted from $530,000)</p>
+            <p class="card-text">API Pricing: $2,000/month (up to 500,000 API calls)</p>
+            <p class="card-text">Hourly Consulting: $1,000/hour</p>
+            <button class="btn btn-warning bundle-btn" data-plan="premiumbundle">Choose Bundle</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-md-6">
+        <div class="card mb-4">
+          <div class="card-body">
+            <h5 class="card-title">Risk & Compliance Management Suite</h5>
+            <p class="card-text">Bundle Price: $510,000/year (Discounted from $615,000)</p>
+            <p class="card-text">API Pricing: $2,500/month (up to 500,000 API calls)</p>
+            <p class="card-text">Hourly Consulting: $1,200/hour</p>
+            <button class="btn btn-warning bundle-btn" data-plan="riskcompliancebundle">Choose Bundle</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stripe Integration -->
+  <script src="https://js.stripe.com/v3/"></script>
+  <script>
+    const stripe = Stripe('<%= stripePublishableKey %>');
+
+    document.addEventListener("DOMContentLoaded", function() {
+      // Handle plan buttons
+      document.querySelectorAll('.checkout-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+          const planName = button.dataset.plan;
+          fetch('/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan: planName })
+          })
+          .then(res => res.json())
+          .then(session => stripe.redirectToCheckout({ sessionId: session.id }))
+          .catch(err => console.error("Error:", err));
+        });
+      });
+
+      // Handle bundle buttons
+      document.querySelectorAll('.bundle-btn').forEach(function(button) {
+        button.addEventListener('click', function() {
+          const planName = button.dataset.plan;
+          fetch('/checkout', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ plan: planName })
+          })
+          .then(res => res.json())
+          .then(session => stripe.redirectToCheckout({ sessionId: session.id }))
+          .catch(err => console.error("Error:", err));
+        });
+      });
+    });
+  </script>
+</body>
+</html>
