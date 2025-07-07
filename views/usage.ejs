@@ -16,33 +16,13 @@
                 <p>API Calls: <span id="current-calls"><%= currentCalls %></span> out of <span id="plan-api-limit"><%= apiLimit %></span></p>
                 <p><strong>Rate Limit:</strong> 60 requests per minute</p>
 
-                <h4>Upgrade Plan:</h4>
-                <button class="btn btn-primary" id="upgrade-plan">Upgrade Plan</button>
-                <a href="/profile" class="btn btn-secondary ml-3">Profile</a>
-                <a href="/settings" class="btn btn-secondary ml-3">Settings</a>
-                <a href="/logout" class="btn btn-danger ml-3">Logout</a>
+                <h4>Actions:</h4>
+                <a href="/store" class="btn btn-primary">Upgrade Plan</a>
+                <a href="/profile" class="btn btn-secondary ml-2">Profile</a>
+                <a href="/settings" class="btn btn-secondary ml-2">Settings</a>
+                <a href="/logout" class="btn btn-danger ml-2">Logout</a>
             </div>
         </div>
-
-        <div id="upgrade-section" class="mt-4" style="display: none;">
-            <h4>Choose an upgrade plan:</h4>
-            <button class="btn btn-success" id="upgrade-to-tier-2">Upgrade to Tier 2</button>
-            <button class="btn btn-danger" id="upgrade-to-tier-3">Upgrade to Tier 3</button>
-        </div>
     </div>
-
-    <script>
-        document.getElementById('upgrade-plan').addEventListener('click', function() {
-            document.getElementById('upgrade-section').style.display = 'block';
-        });
-
-        document.getElementById('upgrade-to-tier-2').addEventListener('click', function() {
-            window.location.href = '/store';  // Redirect to store page to upgrade
-        });
-
-        document.getElementById('upgrade-to-tier-3').addEventListener('click', function() {
-            window.location.href = '/store';  // Redirect to store page to upgrade
-        });
-    </script>
 </body>
 </html>
