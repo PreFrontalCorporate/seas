@@ -5,24 +5,25 @@ import fetch from 'node-fetch';
 import { AuthenticationClient } from 'auth0';
 import Stripe from 'stripe';
 import dotenv from 'dotenv';
+import crypto from 'crypto';
+import Redis from 'ioredis';
 
 dotenv.config();
 
 const app = express();
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
+const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 
 // Define getPlanDetails
 const getPlanDetails = async (accessToken) => {
-    return new Promise((resolve) => {
-        resolve({
-            planName: 'Basic Plan',
-            currentCalls: 50,
-            apiLimit: 100
-        });
-    });
+    return {
+        planName: 'Basic Plan',
+        currentCalls: 50,
+        apiLimit: 100
+    };
 };
 
-// Initialize Auth0Client
+// Initialize Auth0 client (not strictly used here, but included)
 const auth0Client = new AuthenticationClient({
     domain: process.env.AUTH0_DOMAIN,
     clientId: process.env.AUTH0_CLIENT_ID,
@@ -75,9 +76,7 @@ app.get('/callback', async (req, res) => {
     try {
         const tokenResponse = await fetch(`https://${process.env.AUTH0_DOMAIN}/oauth/token`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 client_id: process.env.AUTH0_CLIENT_ID,
                 client_secret: process.env.AUTH0_CLIENT_SECRET,
@@ -89,6 +88,9 @@ app.get('/callback', async (req, res) => {
 
         const tokenData = await tokenResponse.json();
         req.session.accessToken = tokenData.access_token;
+
+        // In a real app, you'd also decode the ID token or userinfo to get user ID
+        req.session.clientId = tokenData.access_token.slice(0, 12); // Simplified fake client ID
         res.redirect('/usage');
     } catch (err) {
         console.log('Error during Auth0 callback:', err);
@@ -96,7 +98,7 @@ app.get('/callback', async (req, res) => {
     }
 });
 
-// Logout route
+// Logout
 app.get('/logout', (req, res) => {
     req.session.destroy(() => {
         res.redirect(`https://${process.env.AUTH0_DOMAIN}/v2/logout?returnTo=${process.env.BASE_URL}`);
@@ -106,76 +108,83 @@ app.get('/logout', (req, res) => {
 // Usage page
 app.get('/usage', async (req, res) => {
     console.log('Accessing /usage route');
-    if (!req.session.accessToken) {
-        console.log('No access token found, redirecting to login');
+    if (!req.session.accessToken || !req.session.clientId) {
+        console.log('No access token or client ID found, redirecting to login');
         return res.redirect('/login');
     }
 
     try {
         const planDetails = await getPlanDetails(req.session.accessToken);
+
+        // Get or create API secret
+        let apiSecret = await redis.get(`user:${req.session.clientId}:api_secret`);
+        if (!apiSecret) {
+            apiSecret = crypto.randomBytes(24).toString('base64url');
+            await redis.set(`user:${req.session.clientId}:api_secret`, apiSecret);
+        }
+
         res.render('usage', {
-            planName: planDetails.planName,
-            currentCalls: planDetails.currentCalls,
-            apiLimit: planDetails.apiLimit
+            usage: planDetails,
+            api_secret: apiSecret
         });
     } catch (error) {
-        res.send('Error fetching plan details');
+        console.error('Error fetching plan details or API secret:', error);
+        res.send('Error fetching usage information');
     }
 });
 
-// Profile page
-app.get('/profile', async (req, res) => {
-    if (!req.session.accessToken) {
+// Regenerate API secret
+app.post('/api/regenerate_secret', async (req, res) => {
+    if (!req.session.clientId) {
         return res.redirect('/login');
     }
+
+    const newSecret = crypto.randomBytes(24).toString('base64url');
+    await redis.set(`user:${req.session.clientId}:api_secret`, newSecret);
+
+    res.redirect('/usage');
+});
+
+// Profile
+app.get('/profile', async (req, res) => {
+    if (!req.session.accessToken) return res.redirect('/login');
     const planDetails = await getPlanDetails(req.session.accessToken);
-    const userEmail = 'user@example.com'; // Placeholder email
     res.render('profile', {
-        userEmail: userEmail,
+        userEmail: 'user@example.com',
         planName: planDetails.planName,
         currentCalls: planDetails.currentCalls,
         apiLimit: planDetails.apiLimit
     });
 });
 
-// Settings page
+// Settings
 app.get('/settings', async (req, res) => {
-    if (!req.session.accessToken) {
-        return res.redirect('/login');
-    }
+    if (!req.session.accessToken) return res.redirect('/login');
     const planDetails = await getPlanDetails(req.session.accessToken);
-    const userEmail = 'user@example.com'; // Placeholder email
     res.render('settings', {
-        userEmail: userEmail,
+        userEmail: 'user@example.com',
         planName: planDetails.planName
     });
 });
 
-// Store page
+// Store
 app.get('/store', (req, res) => {
     const plans = [
-        { name: "Basic Plan", price: 1200, apiPrice: 50, consultingRate: 200 },   // price in cents/year
+        { name: "Basic Plan", price: 1200, apiPrice: 50, consultingRate: 200 },
         { name: "Premium Plan", price: 6000, apiPrice: 200, consultingRate: 400 }
     ];
     res.render('store', { stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY, plans: plans });
 });
 
-// Stripe checkout
+// Checkout
 app.post('/checkout', async (req, res) => {
     const { plan } = req.body;
     try {
-        // Adjust price based on the monthly API price in cents
-        let amount = 1000; // fallback default price
-
-        if (plan === 'basicplan') {
-            amount = 5000; // $50/month => 5000 cents
-        } else if (plan === 'premiumplan') {
-            amount = 20000; // $200/month => 20000 cents
-        } else if (plan === 'premiumbundle') {
-            amount = 200000; // Example: $2,000/month => 200000 cents
-        } else if (plan === 'riskcompliancebundle') {
-            amount = 250000; // Example: $2,500/month => 250000 cents
-        }
+        let amount = 1000;
+        if (plan === 'basicplan') amount = 5000;
+        else if (plan === 'premiumplan') amount = 20000;
+        else if (plan === 'premiumbundle') amount = 200000;
+        else if (plan === 'riskcompliancebundle') amount = 250000;
 
         const session = await stripe.checkout.sessions.create({
             payment_method_types: ['card'],
@@ -183,9 +192,7 @@ app.post('/checkout', async (req, res) => {
                 {
                     price_data: {
                         currency: 'usd',
-                        product_data: {
-                            name: plan,
-                        },
+                        product_data: { name: plan },
                         unit_amount: amount,
                     },
                     quantity: 1,
@@ -203,17 +210,17 @@ app.post('/checkout', async (req, res) => {
     }
 });
 
-// Checkout success page
+// Checkout success
 app.get('/checkout-success', (req, res) => {
     res.render('checkout');
 });
 
-// 404 handler
+// 404
 app.use((req, res) => {
     res.status(404).render('error');
 });
 
-// Start server
+// Start
 const port = process.env.PORT || 8080;
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
