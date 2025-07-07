@@ -75,7 +75,7 @@
     const stripe = Stripe('<%= stripePublishableKey %>');
 
     document.addEventListener("DOMContentLoaded", function() {
-      // Handle plan buttons
+      // Plan buttons
       document.querySelectorAll('.checkout-btn').forEach(function(button) {
         button.addEventListener('click', function() {
           const planName = button.dataset.plan;
@@ -90,7 +90,7 @@
         });
       });
 
-      // Handle bundle buttons
+      // Bundle buttons
       document.querySelectorAll('.bundle-btn').forEach(function(button) {
         button.addEventListener('click', function() {
           const planName = button.dataset.plan;
