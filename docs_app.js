@@ -1,6 +1,6 @@
-import express from 'express';
-import fs from 'fs';
-import MarkdownIt from 'markdown-it';
+const express = require('express');
+const fs = require('fs');
+const MarkdownIt = require('markdown-it');
 
 const app = express();
 const md = new MarkdownIt();
