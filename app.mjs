@@ -13,6 +13,7 @@ const stripe = Stripe(process.env.STRIPE_SECRET_KEY);  // Your Stripe secret key
 
 // Define the getPlanDetails function
 const getPlanDetails = async (accessToken) => {
+    // This is just a placeholder. Replace this with actual logic to fetch plan details.
     return new Promise((resolve) => {
         resolve({
             planName: 'Basic Plan',
@@ -69,6 +70,7 @@ app.get('/login', (req, res) => {
 
 // Auth0 Callback route - handle Auth0 callback after login
 app.get('/callback', async (req, res) => {
+    console.log('Auth0 Callback Route Hit');
     const { code } = req.query;
 
     if (!code) {
@@ -94,6 +96,7 @@ app.get('/callback', async (req, res) => {
         req.session.accessToken = tokenData.access_token;
         res.redirect('/usage');  // Redirect to usage page after login
     } catch (err) {
+        console.log('Error during Auth0 callback:', err);
         res.send('Error during Auth0 callback');
     }
 });
@@ -108,18 +111,22 @@ app.get('/logout', (req, res) => {
 
 // Usage page - Display the user's API usage after login
 app.get('/usage', async (req, res) => {
+    console.log('Accessing /usage route');
     if (!req.session.accessToken) {
+        console.log('No access token found, redirecting to login');
         return res.redirect('/login');  // Ensure the user is logged in
     }
 
     try {
         const planDetails = await getPlanDetails(req.session.accessToken);  // Fetch user plan details using the access token
+        console.log('Plan Details:', planDetails);  // Log the plan details
         res.render('usage', {
             planName: planDetails.planName,
             currentCalls: planDetails.currentCalls,
             apiLimit: planDetails.apiLimit
         });
     } catch (error) {
+        console.error('Error fetching plan details:', error);  // Log the error
         res.send('Error fetching plan details');
     }
 });
@@ -149,12 +156,14 @@ app.post('/checkout', async (req, res) => {
 
         res.json({ sessionId: session.id });
     } catch (err) {
+        console.error('Error creating checkout session:', err);
         res.status(500).send('Error creating checkout session');
     }
 });
 
 // Error handling page for 404
 app.use((req, res, next) => {
+    console.log(`Request to ${req.url} not found`);  // Log the request that resulted in a 404
     res.status(404).render('error');
 });
 
@@ -163,4 +172,3 @@ const port = process.env.PORT || 8080;
 app.listen(port, () => {
     console.log(`Server is running on http://localhost:${port}`);
 });
-
