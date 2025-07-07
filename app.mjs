@@ -14,7 +14,6 @@ const app = express();
 const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379");
 
-// Define getPlanDetails
 const getPlanDetails = async (accessToken) => {
     return {
         planName: 'Basic Plan',
@@ -23,7 +22,6 @@ const getPlanDetails = async (accessToken) => {
     };
 };
 
-// Initialize Auth0 client (not strictly used here, but included)
 const auth0Client = new AuthenticationClient({
     domain: process.env.AUTH0_DOMAIN,
     clientId: process.env.AUTH0_CLIENT_ID,
@@ -31,7 +29,6 @@ const auth0Client = new AuthenticationClient({
     redirectUri: `${process.env.BASE_URL}/callback`,
 });
 
-// Use import.meta.url to resolve __dirname
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 app.set('view engine', 'ejs');
@@ -47,7 +44,6 @@ app.use(session({
     }
 }));
 
-// Landing page
 app.get('/', (req, res) => {
     res.render('landing', {
         imagePath: '/images/seas_logo.png',
@@ -58,13 +54,11 @@ app.get('/', (req, res) => {
     });
 });
 
-// Login route
 app.get('/login', (req, res) => {
     const authUrl = `https://${process.env.AUTH0_DOMAIN}/authorize?client_id=${process.env.AUTH0_CLIENT_ID}&response_type=code&redirect_uri=${process.env.BASE_URL}/callback`;
     res.redirect(authUrl);
 });
 
-// Callback route
 app.get('/callback', async (req, res) => {
     console.log('Auth0 Callback Route Hit');
     const { code } = req.query;
@@ -88,8 +82,6 @@ app.get('/callback', async (req, res) => {
 
         const tokenData = await tokenResponse.json();
         req.session.accessToken = tokenData.access_token;
-
-        // In a real app, you'd also decode the ID token or userinfo to get user ID
         req.session.clientId = tokenData.access_token.slice(0, 12); // Simplified fake client ID
         res.redirect('/usage');
     } catch (err) {
@@ -98,14 +90,12 @@ app.get('/callback', async (req, res) => {
     }
 });
 
-// Logout
 app.get('/logout', (req, res) => {
     req.session.destroy(() => {
         res.redirect(`https://${process.env.AUTH0_DOMAIN}/v2/logout?returnTo=${process.env.BASE_URL}`);
     });
 });
 
-// Usage page
 app.get('/usage', async (req, res) => {
     console.log('Accessing /usage route');
     if (!req.session.accessToken || !req.session.clientId) {
@@ -115,8 +105,6 @@ app.get('/usage', async (req, res) => {
 
     try {
         const planDetails = await getPlanDetails(req.session.accessToken);
-
-        // Get or create API secret
         let apiSecret = await redis.get(`user:${req.session.clientId}:api_secret`);
         if (!apiSecret) {
             apiSecret = crypto.randomBytes(24).toString('base64url');
@@ -133,7 +121,6 @@ app.get('/usage', async (req, res) => {
     }
 });
 
-// Regenerate API secret
 app.post('/api/regenerate_secret', async (req, res) => {
     if (!req.session.clientId) {
         return res.redirect('/login');
@@ -145,7 +132,52 @@ app.post('/api/regenerate_secret', async (req, res) => {
     res.redirect('/usage');
 });
 
-// Profile
+// ✅ External API secret validation route
+app.post('/api/validate_secret_external', async (req, res) => {
+    const { api_secret, client_id } = req.body;
+    if (!client_id || !api_secret) {
+        return res.status(400).json({ message: "Missing client_id or api_secret" });
+    }
+
+    const storedSecret = await redis.get(`user:${client_id}:api_secret`);
+    if (!storedSecret) {
+        return res.status(404).json({ message: "No secret found for this client_id" });
+    }
+
+    if (storedSecret === api_secret) {
+        return res.json({ message: "Secret is valid!" });
+    } else {
+        return res.status(401).json({ message: "Invalid secret!" });
+    }
+});
+
+// ✅ Permanent key-based endpoint (callable from anywhere using Authorization header)
+app.post('/api/some_endpoint', async (req, res) => {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: "Missing or invalid Authorization header" });
+    }
+
+    const apiSecret = authHeader.split(' ')[1];
+
+    const keys = await redis.keys('user:*:api_secret');
+    let clientId = null;
+    for (const key of keys) {
+        const stored = await redis.get(key);
+        if (stored === apiSecret) {
+            clientId = key.split(':')[1];
+            break;
+        }
+    }
+
+    if (!clientId) {
+        return res.status(401).json({ message: "Invalid API secret" });
+    }
+
+    // ✅ You now have clientId — can add rate limits, usage checks, etc.
+    res.json({ message: `API call successful for client ${clientId}` });
+});
+
 app.get('/profile', async (req, res) => {
     if (!req.session.accessToken) return res.redirect('/login');
     const planDetails = await getPlanDetails(req.session.accessToken);
@@ -157,7 +189,6 @@ app.get('/profile', async (req, res) => {
     });
 });
 
-// Settings
 app.get('/settings', async (req, res) => {
     if (!req.session.accessToken) return res.redirect('/login');
     const planDetails = await getPlanDetails(req.session.accessToken);
@@ -167,7 +198,6 @@ app.get('/settings', async (req, res) => {
     });
 });
 
-// Store
 app.get('/store', (req, res) => {
     const plans = [
         { name: "Basic Plan", price: 1200, apiPrice: 50, consultingRate: 200 },
@@ -176,7 +206,6 @@ app.get('/store', (req, res) => {
     res.render('store', { stripePublishableKey: process.env.STRIPE_PUBLISHABLE_KEY, plans: plans });
 });
 
-// Checkout
 app.post('/checkout', async (req, res) => {
     const { plan } = req.body;
     try {
@@ -210,17 +239,15 @@ app.post('/checkout', async (req, res) => {
     }
 });
 
-// Checkout success
 app.get('/checkout-success', (req, res) => {
     res.render('checkout');
 });
 
-// 404
 app.use((req, res) => {
     res.status(404).render('error');
 });
 
-// Start
+// ✅ Listen on 0.0.0.0 for external access
 const port = process.env.PORT || 8080;
 app.listen(port, "0.0.0.0", () => {
     console.log(`Server is running on http://0.0.0.0:${port}`);
