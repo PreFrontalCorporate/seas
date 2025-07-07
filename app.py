@@ -25,6 +25,37 @@ redis_port = int(os.getenv('REDIS_PORT', 6379))
 redis_db = int(os.getenv('REDIS_DB', 0))
 r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
 
+# Stronger API key check: abort on failure
+def verify_api_key_or_abort():
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        abort(401, description="Missing or invalid Authorization header")
+    api_secret = auth_header.split(' ')[1]
+
+    keys = r.keys('user:*:api_secret')
+    for key in keys:
+        stored = r.get(key)
+        if stored == api_secret:
+            return key.split(':')[1]
+    abort(401, description="Invalid API key")
+
+# Add before_request hooks BEFORE registering blueprints
+@cvar_bp.before_request
+def require_api_key_cvar():
+    verify_api_key_or_abort()
+
+@wasserstein_bp.before_request
+def require_api_key_wasserstein():
+    verify_api_key_or_abort()
+
+@heavy_tail_bp.before_request
+def require_api_key_heavy_tail():
+    verify_api_key_or_abort()
+
+@kolmogorov_bp.before_request
+def require_api_key_kolmogorov():
+    verify_api_key_or_abort()
+
 # Initialize Flask app
 def create_master_app():
     app = Flask(__name__)
@@ -75,37 +106,6 @@ def regenerate_api_secret(user_id):
 def validate_api_secret(user_id, provided_secret):
     stored_secret = get_api_secret(user_id)
     return secrets.compare_digest(stored_secret or '', provided_secret)
-
-# Stronger API key check: abort on failure
-def verify_api_key_or_abort():
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        abort(401, description="Missing or invalid Authorization header")
-    api_secret = auth_header.split(' ')[1]
-
-    keys = r.keys('user:*:api_secret')
-    for key in keys:
-        stored = r.get(key)
-        if stored == api_secret:
-            return key.split(':')[1]
-    abort(401, description="Invalid API key")
-
-# Enforce API key on sub-apps
-@cvar_bp.before_request
-def require_api_key_cvar():
-    verify_api_key_or_abort()
-
-@wasserstein_bp.before_request
-def require_api_key_wasserstein():
-    verify_api_key_or_abort()
-
-@heavy_tail_bp.before_request
-def require_api_key_heavy_tail():
-    verify_api_key_or_abort()
-
-@kolmogorov_bp.before_request
-def require_api_key_kolmogorov():
-    verify_api_key_or_abort()
 
 # Auth routes
 @app.route('/protected')
