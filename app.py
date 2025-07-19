@@ -308,12 +308,14 @@ def validate_api_secret(user_id, provided):
 def protected_route():
     return {"message": "This is a protected route!"}
 
-@app.route('/login')
+@app.route("/login")
 def login():
+    """
+    Simple redirect that sends the user to the public RapidAPI listing.
+    """
     return redirect(
-        'https://rapidapi.com/seas-financial-seas-financial-default/'
-        'api/cbb-homes-risk-portfolio-analytics-api/pricing',
-        code=302
+        "https://rapidapi.com/seas-financial-seas-financial-default/"
+        "api/cbb-homes-risk-portfolio-analytics-api"
     )
 
 @app.route('/login/callback')
