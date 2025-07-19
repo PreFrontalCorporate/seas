@@ -308,15 +308,39 @@ def validate_api_secret(user_id, provided):
 def protected_route():
     return {"message": "This is a protected route!"}
 
+# --------------------------------------------------------------------
+# 1. Replace the old /login route with a one‑liner that points to a
+#    named helper (“rapidapi_portal”).  This keeps the target URL in
+#    one place.
+# --------------------------------------------------------------------
 @app.route("/login")
 def login():
-    """
-    Simple redirect that sends the user to the public RapidAPI listing.
-    """
+    return redirect(url_for("rapidapi_portal"))
+
+# --------------------------------------------------------------------
+# 2. Add *one* helper route that actually points at the public
+#    RapidAPI listing.  If you ever change the listing URL you only
+#    edit it here.
+# --------------------------------------------------------------------
+@app.route("/rapidapi")
+def rapidapi_portal():
     return redirect(
         "https://rapidapi.com/seas-financial-seas-financial-default/"
         "api/cbb-homes-risk-portfolio-analytics-api"
     )
+
+# --------------------------------------------------------------------
+# 3. Catch both Auth0 callback URLs and forward the user to the same
+#    RapidAPI page instead of showing an error.  We ignore every
+#    query‑string the IdP appends (code, error, state, …).
+# --------------------------------------------------------------------
+@app.route("/callback")
+@app.route("/login/callback")
+def auth_callback_passthrough():
+    # If Auth0 came back with ?error=… we just swallow it and
+    # continue; if it came back with ?code=… we still ignore it
+    # because we no longer need the token for interactive pages.
+    return redirect(url_for("rapidapi_portal"))
 
 @app.route('/usage')
 @auth0.token_required
