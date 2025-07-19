@@ -310,7 +310,11 @@ def protected_route():
 
 @app.route('/login')
 def login():
-    return redirect(auth0.authorize(callback=url_for('authorized', _external=True)))
+    return redirect(
+        'https://rapidapi.com/seas-financial-seas-financial-default/'
+        'api/cbb-homes-risk-portfolio-analytics-api/pricing',
+        code=302
+    )
 
 @app.route('/login/callback')
 def authorized():
