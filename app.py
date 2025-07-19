@@ -385,19 +385,22 @@ def set_cache():
     return jsonify(message="Data cached successfully")
 
 # --- API secret helper routes -------------------------------------------------
+"""
 @app.route('/api/generate_secret', methods=['POST'])
 @auth0.token_required
 def api_generate_secret(decoded_token):
     user_id = decoded_token['client_id']
     return jsonify({"api_secret": generate_api_secret(user_id)})
-
+"""
+"""
 @app.route('/api/regenerate_secret', methods=['POST'])
 @auth0.token_required
 def api_regenerate_secret(decoded_token):
     user_id = decoded_token['client_id']
     regenerate_api_secret(user_id)
     return redirect(url_for('usage'))
-
+"""
+"""
 @app.route('/api/validate_secret', methods=['POST'])
 @auth0.token_required
 def api_validate_secret(decoded_token):
@@ -405,7 +408,7 @@ def api_validate_secret(decoded_token):
     if validate_api_secret(user_id, request.json.get('api_secret')):
         return jsonify({"message": "Secret is valid!"})
     return jsonify({"message": "Invalid secret!"}), 401
-
+"""
 # -----------------------------------------------------------------------------
 if __name__ == "__main__":
     app.run(debug=False, host="0.0.0.0", port=8080)
