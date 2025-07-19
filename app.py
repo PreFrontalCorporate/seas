@@ -318,24 +318,6 @@ def login():
         "api/cbb-homes-risk-portfolio-analytics-api"
     )
 
-@app.route('/login/callback')
-def authorized():
-    response = auth0.authorized_response()
-    if response is None or response.get('access_token') is None:
-        return 'Access denied: reason={} error={}'.format(
-            request.args['error_reason'], request.args['error_description'])
-    session['auth_token'] = response['access_token']
-    return redirect(url_for('index'))
-
-@app.route('/logout')
-def logout():
-    session.pop('auth_token', None)
-    return redirect(url_for('index'))
-
-@app.route('/store')
-def store():
-    return render_template('store.ejs', plans=get_plan_details())
-
 @app.route('/usage')
 @auth0.token_required
 def usage(decoded_token):
