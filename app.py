@@ -37,6 +37,7 @@ r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db, decode_resp
 # -----------------------------------------------------------------------------
 # Auth helper
 # -----------------------------------------------------------------------------
+
 def verify_api_key_or_abort():
     """Abort request if Authorization header is missing or invalid."""
     auth_header = request.headers.get('Authorization')
@@ -52,6 +53,7 @@ def verify_api_key_or_abort():
 # -----------------------------------------------------------------------------
 # Inject auth check into every Blueprint BEFORE registration
 # -----------------------------------------------------------------------------
+
 @cvar_bp.before_request
 @wasserstein_bp.before_request
 @heavy_tail_bp.before_request
@@ -62,6 +64,7 @@ def _global_api_guard():
 # -----------------------------------------------------------------------------
 # Blueprint‑level documented route example (CVaR)
 # -----------------------------------------------------------------------------
+
 @cvar_bp.route("/estimate", methods=["POST"])
 def estimate_cvar():
     """
@@ -92,12 +95,138 @@ def estimate_cvar():
               cvar: -0.0731
               method: historical
     """
-    # <-- real logic should call your optimiser here -->
+    # TODO: Call actual CVaR estimator in cvar_app
     return jsonify({"cvar": -0.0731, "method": "historical"})
+
+# -----------------------------------------------------------------------------
+# Wasserstein robust optimiser
+# -----------------------------------------------------------------------------
+
+@wasserstein_bp.route("/optimize", methods=["POST"])
+def optimize_wasserstein():
+    """
+    Wasserstein robust portfolio optimisation
+    ---
+    tags: [Wasserstein]
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              assets:
+                type: array
+                items: number
+              risk_aversion:
+                type: number
+            required: [assets, risk_aversion]
+          example:
+            assets: [0.4, 0.6]
+            risk_aversion: 0.5
+    responses:
+      200:
+        description: Optimised weights
+        content:
+          application/json:
+            example:
+              weights: [0.38, 0.62]
+              wasserstein_radius: 0.1
+    """
+    data = request.get_json(force=True)
+    # TODO: Replace with real call e.g., wasserstein_app.app.optimize_portfolio
+    weights = [round(x * 0.95, 2) for x in data.get("assets", [])]
+    return jsonify({"weights": weights, "wasserstein_radius": 0.1})
+
+# -----------------------------------------------------------------------------
+# Heavy-tail volatility simulator
+# -----------------------------------------------------------------------------
+
+@heavy_tail_bp.route("/simulate", methods=["POST"])
+def simulate_heavy_tail():
+    """
+    Heavy-tail volatility simulation
+    ---
+    tags: [HeavyTail]
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              shock_magnitude: {type: number}
+              periods: {type: integer}
+            required: [shock_magnitude, periods]
+          example:
+            shock_magnitude: 3.0
+            periods: 100
+    responses:
+      200:
+        description: Simulated return series
+        content:
+          application/json:
+            example:
+              series: [0.021, -0.033, 0.017]
+    """
+    data = request.get_json(force=True)
+    shock = float(data.get("shock_magnitude", 1))
+    periods = int(data.get("periods", 10))
+    # Dummy simulation
+    series = [round(((i % 2) * -2 + 1) * shock * 0.01, 3) for i in range(periods)]
+    return jsonify({"series": series})
+
+# -----------------------------------------------------------------------------
+# Kolmogorov complexity explorer
+# -----------------------------------------------------------------------------
+
+@kolmogorov_bp.route("/explore", methods=["POST"])
+def explore_kolmogorov():
+    """
+    Kolmogorov complexity explorer
+    ---
+    tags: [Kolmogorov]
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: array
+                items: number
+            required: [data]
+          example:
+            data: [1.2, 0.8, 1.5, 0.6]
+    responses:
+      200:
+        description: Complexity metrics
+        content:
+          application/json:
+            example:
+              complexity_score: 0.72
+    """
+    data = request.get_json(force=True)
+    nums = data.get("data", [])
+    # Dummy complexity score: normalised variance
+    if not nums:
+        return jsonify({"complexity_score": 0})
+    mean = sum(nums) / len(nums)
+    var = sum((x - mean) ** 2 for x in nums) / len(nums)
+    complexity = round(min(var / 10, 1), 2)
+    return jsonify({"complexity_score": complexity})
 
 # -----------------------------------------------------------------------------
 # Factory pattern
 # -----------------------------------------------------------------------------
+
 def create_master_app():
     app = Flask(__name__)
 
@@ -131,13 +260,13 @@ def create_master_app():
 # -----------------------------------------------------------------------------
 # Build the app & Swagger UI
 # -----------------------------------------------------------------------------
+
 auth0 = Auth0Middleware(domain="dev-7sz8prkr8rp6t8mx.us.auth0.com",
                         client_id=os.getenv('AUTH0_CLIENT_ID'),
                         client_secret=os.getenv('AUTH0_CLIENT_SECRET'))
 
 app = create_master_app()
 
-# NEW: Initialise Flasgger ‑ generates /apidocs & swagger.json
 swagger_template = {
     "info": {
         "title": "CBB Homes API",
@@ -149,11 +278,12 @@ swagger_template = {
             "type": "apiKey",
             "name": "Authorization",
             "in": "header",
-            "description": "Enter **Bearer &lt;YOUR_API_SECRET&gt;**"
+            "description": "Enter **Bearer <YOUR_API_SECRET>**"
         }
     },
     "schemes": ["https"]
 }
+
 swagger = Swagger(app, template=swagger_template, merge=True)
 
 # -----------------------------------------------------------------------------
