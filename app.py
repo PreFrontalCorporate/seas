@@ -41,18 +41,10 @@ r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db, decode_resp
 # RapidAPI-only auth check
 # -----------------------------------------------------------------------------
 def verify_api_key_or_abort():
-    """
-    Allows traffic **only** if the request passed through RapidAPI.
-    RapidAPI injects two headers:
-      * X-RapidAPI-Proxy-Secret — proves the proxy made the call
-      * X-RapidAPI-Key         — the consumer’s key RapidAPI already validated
-    """
     proxy_secret = request.headers.get('X-RapidAPI-Proxy-Secret')
     if proxy_secret != os.getenv('RAPIDAPI_PROXY_SECRET'):
         abort(401, "Request did not originate from RapidAPI")
-
-    if not request.headers.get('X-RapidAPI-Key'):
-        abort(401, "Missing RapidAPI key")
+    # Remove the key-presence check entirely
 
 # -----------------------------------------------------------------------------
 # Inject auth check into every Blueprint BEFORE registration
