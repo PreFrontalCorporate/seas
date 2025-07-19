@@ -4,74 +4,120 @@ import redis
 import secrets
 from flask import Flask, jsonify, request, render_template, redirect, url_for, session, abort
 from auth.middleware import Auth0Middleware
+
+# ---- API Blueprints ---------------------------------------------------------
 from cvar_app.app.main import cvar_bp
 from wasserstein_app.app import wasserstein_bp
 from heavy_tail_app.app import heavy_tail_bp
 from kolmogorov_app.api.optimize import kolmogorov_bp
 from billing.webhooks import webhook_bp
+
 from usage.rate_limiter import rate_limit
 from billing.stripe_utils import create_checkout_session, get_plan_details
 from dotenv import load_dotenv
 
+# ✨ NEW – Swagger -------------------------------------------------------------
+from flasgger import Swagger
+
+# -----------------------------------------------------------------------------
 # Load environment variables
+# -----------------------------------------------------------------------------
 load_dotenv()
 
-# Initialize Stripe
+# -----------------------------------------------------------------------------
+# Stripe / Redis config
+# -----------------------------------------------------------------------------
 stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
-# Initialize Redis
 redis_host = os.getenv('REDIS_HOST', 'localhost')
 redis_port = int(os.getenv('REDIS_PORT', 6379))
-redis_db = int(os.getenv('REDIS_DB', 0))
+redis_db   = int(os.getenv('REDIS_DB', 0))
 r = redis.StrictRedis(host=redis_host, port=redis_port, db=redis_db, decode_responses=True)
 
-# Stronger API key check: abort on failure
+# -----------------------------------------------------------------------------
+# Auth helper
+# -----------------------------------------------------------------------------
 def verify_api_key_or_abort():
+    """Abort request if Authorization header is missing or invalid."""
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
         abort(401, description="Missing or invalid Authorization header")
     api_secret = auth_header.split(' ')[1]
 
-    keys = r.keys('user:*:api_secret')
-    for key in keys:
-        stored = r.get(key)
-        if stored == api_secret:
-            return key.split(':')[1]
+    for key in r.keys('user:*:api_secret'):
+        if r.get(key) == api_secret:
+            return key.split(':')[1]          # returns user_id
     abort(401, description="Invalid API key")
 
-# Add before_request hooks BEFORE registering blueprints
+# -----------------------------------------------------------------------------
+# Inject auth check into every Blueprint BEFORE registration
+# -----------------------------------------------------------------------------
 @cvar_bp.before_request
-def require_api_key_cvar():
-    verify_api_key_or_abort()
-
 @wasserstein_bp.before_request
-def require_api_key_wasserstein():
-    verify_api_key_or_abort()
-
 @heavy_tail_bp.before_request
-def require_api_key_heavy_tail():
-    verify_api_key_or_abort()
-
 @kolmogorov_bp.before_request
-def require_api_key_kolmogorov():
+def _global_api_guard():
     verify_api_key_or_abort()
 
-# Initialize Flask app
+# -----------------------------------------------------------------------------
+# Blueprint‑level documented route example (CVaR)
+# -----------------------------------------------------------------------------
+@cvar_bp.route("/estimate", methods=["POST"])
+def estimate_cvar():
+    """
+    Estimate CVaR
+    ---
+    tags:
+      - CVaR
+    security:
+      - bearerAuth: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CVaRRequest'
+          examples:
+            basic:
+              summary: Simple two‑asset portfolio
+              value:
+                portfolio: [0.3, 0.7]
+                confidence_level: 0.95
+    responses:
+      200:
+        description: Result
+        content:
+          application/json:
+            example:
+              cvar: -0.0731
+              method: historical
+    """
+    # <-- real logic should call your optimiser here -->
+    return jsonify({"cvar": -0.0731, "method": "historical"})
+
+# -----------------------------------------------------------------------------
+# Factory pattern
+# -----------------------------------------------------------------------------
 def create_master_app():
     app = Flask(__name__)
 
-    app.register_blueprint(cvar_bp, url_prefix="/cvar")
-    app.register_blueprint(wasserstein_bp, url_prefix="/wasserstein")
-    app.register_blueprint(heavy_tail_bp, url_prefix="/heavy-tail")
-    app.register_blueprint(kolmogorov_bp, url_prefix="/kolmogorov")
+    # Register all Blueprints
+    app.register_blueprint(cvar_bp,         url_prefix="/cvar")
+    app.register_blueprint(wasserstein_bp,  url_prefix="/wasserstein")
+    app.register_blueprint(heavy_tail_bp,   url_prefix="/heavy-tail")
+    app.register_blueprint(kolmogorov_bp,   url_prefix="/kolmogorov")
     app.register_blueprint(webhook_bp)
 
-    app.config['SECRET_KEY'] = os.getenv('FLASK_APP_SECRET_KEY', 'default_secret_key')
-    app.config['DEBUG'] = False
-    app.config['ENV'] = 'production'
-    app.config['STRIPE_SECRET_KEY'] = os.getenv('STRIPE_SECRET_KEY')
-    app.config['STRIPE_WEBHOOK_SECRET'] = os.getenv('STRIPE_WEBHOOK_SECRET')
+    # Core settings
+    app.config.update(
+        SECRET_KEY           = os.getenv('FLASK_APP_SECRET_KEY', 'default_secret_key'),
+        DEBUG                = False,
+        ENV                  = 'production',
+        STRIPE_SECRET_KEY    = os.getenv('STRIPE_SECRET_KEY'),
+        STRIPE_WEBHOOK_SECRET= os.getenv('STRIPE_WEBHOOK_SECRET')
+    )
 
+    # Custom error pages
     @app.errorhandler(404)
     def not_found_error(error):
         return render_template('error.ejs'), 404
@@ -82,32 +128,55 @@ def create_master_app():
 
     return app
 
-# Auth0 Middleware
-auth0 = Auth0Middleware(domain="dev-7sz8prkr8rp6t8mx.us.auth0.com", 
-                        client_id=os.getenv('AUTH0_CLIENT_ID'), 
+# -----------------------------------------------------------------------------
+# Build the app & Swagger UI
+# -----------------------------------------------------------------------------
+auth0 = Auth0Middleware(domain="dev-7sz8prkr8rp6t8mx.us.auth0.com",
+                        client_id=os.getenv('AUTH0_CLIENT_ID'),
                         client_secret=os.getenv('AUTH0_CLIENT_SECRET'))
 
 app = create_master_app()
 
-# Utility functions for API secrets
+# NEW: Initialise Flasgger ‑ generates /apidocs & swagger.json
+swagger_template = {
+    "info": {
+        "title": "CBB Homes API",
+        "version": "1.0.0",
+        "description": "Risk‑analytics & optimisation endpoints for CBB Homes"
+    },
+    "securityDefinitions": {
+        "bearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "Enter **Bearer &lt;YOUR_API_SECRET&gt;**"
+        }
+    },
+    "schemes": ["https"]
+}
+swagger = Swagger(app, template=swagger_template, merge=True)
+
+# -----------------------------------------------------------------------------
+# Helper functions (API secrets, usage, etc.)
+# -----------------------------------------------------------------------------
 def generate_api_secret(user_id):
     secret = secrets.token_urlsafe(32)
-    redis_key = f"user:{user_id}:api_secret"
-    r.set(redis_key, secret)
+    r.set(f"user:{user_id}:api_secret", secret)
     return secret
 
 def get_api_secret(user_id):
-    redis_key = f"user:{user_id}:api_secret"
-    return r.get(redis_key)
+    return r.get(f"user:{user_id}:api_secret")
 
 def regenerate_api_secret(user_id):
     return generate_api_secret(user_id)
 
-def validate_api_secret(user_id, provided_secret):
-    stored_secret = get_api_secret(user_id)
-    return secrets.compare_digest(stored_secret or '', provided_secret)
+def validate_api_secret(user_id, provided):
+    stored = get_api_secret(user_id)
+    return secrets.compare_digest(stored or '', provided)
 
-# Auth routes
+# -----------------------------------------------------------------------------
+# Auth routes & billing / usage
+# -----------------------------------------------------------------------------
 @app.route('/protected')
 @auth0.token_required
 def protected_route():
@@ -122,9 +191,7 @@ def authorized():
     response = auth0.authorized_response()
     if response is None or response.get('access_token') is None:
         return 'Access denied: reason={} error={}'.format(
-            request.args['error_reason'],
-            request.args['error_description']
-        )
+            request.args['error_reason'], request.args['error_description'])
     session['auth_token'] = response['access_token']
     return redirect(url_for('index'))
 
@@ -141,18 +208,16 @@ def store():
 @auth0.token_required
 def usage(decoded_token):
     client_id = decoded_token['client_id']
-    usage_data = get_usage(client_id)  # Implement or update this
-    secret = get_api_secret(client_id)
-    if not secret:
-        secret = generate_api_secret(client_id)
+    usage_data = get_usage(client_id)          # TODO: implement
+    secret = get_api_secret(client_id) or generate_api_secret(client_id)
     return render_template('usage.ejs', usage=usage_data, api_secret=secret)
 
 @app.route('/checkout', methods=['POST'])
 @auth0.token_required
 def checkout(decoded_token):
     client_id = decoded_token['client_id']
-    plan = request.json.get('plan')
-    session = create_checkout_session(client_id, plan)
+    plan     = request.json.get('plan')
+    session  = create_checkout_session(client_id, plan)
     return jsonify({'checkout_url': session.url})
 
 @app.route("/api/some_endpoint", methods=["POST"])
@@ -165,28 +230,23 @@ def some_api_route(decoded_token):
 
 @app.route('/webhook', methods=['POST'])
 def stripe_webhook():
-    payload = request.get_data(as_text=True)
+    payload    = request.get_data(as_text=True)
     sig_header = request.headers.get('Stripe-Signature')
     try:
         event = stripe.Webhook.construct_event(payload, sig_header, os.getenv('STRIPE_WEBHOOK_SECRET'))
-    except ValueError:
-        return 'Invalid payload', 400
-    except stripe.error.SignatureVerificationError:
-        return 'Signature verification failed', 400
-
+    except (ValueError, stripe.error.SignatureVerificationError):
+        return 'Webhook error', 400
     if event['type'] == 'checkout.session.completed':
-        session_obj = event['data']['object']
-        handle_checkout_session(session_obj)  # You need to define this
-
+        handle_checkout_session(event['data']['object'])   # you must define this util
     return '', 200
 
 @app.route('/')
 def index():
-    cached_value = r.get('some_key')
-    if not cached_value:
-        cached_value = 'Hello from Redis!'
-        r.set('some_key', cached_value, ex=300)
-    return jsonify(message=cached_value)
+    cached = r.get('some_key')
+    if not cached:
+        cached = 'Hello from Redis!'
+        r.set('some_key', cached, ex=300)
+    return jsonify(message=cached)
 
 @app.route('/set_cache', methods=['POST'])
 def set_cache():
@@ -194,13 +254,12 @@ def set_cache():
     r.set(data['key'], data['value'], ex=300)
     return jsonify(message="Data cached successfully")
 
-# === API secret routes ===
+# --- API secret helper routes -------------------------------------------------
 @app.route('/api/generate_secret', methods=['POST'])
 @auth0.token_required
 def api_generate_secret(decoded_token):
     user_id = decoded_token['client_id']
-    new_secret = generate_api_secret(user_id)
-    return jsonify({"message": "API secret generated.", "api_secret": new_secret})
+    return jsonify({"api_secret": generate_api_secret(user_id)})
 
 @app.route('/api/regenerate_secret', methods=['POST'])
 @auth0.token_required
@@ -213,12 +272,10 @@ def api_regenerate_secret(decoded_token):
 @auth0.token_required
 def api_validate_secret(decoded_token):
     user_id = decoded_token['client_id']
-    data = request.json
-    provided_secret = data.get('api_secret')
-    if validate_api_secret(user_id, provided_secret):
+    if validate_api_secret(user_id, request.json.get('api_secret')):
         return jsonify({"message": "Secret is valid!"})
-    else:
-        return jsonify({"message": "Invalid secret!"}), 401
+    return jsonify({"message": "Invalid secret!"}), 401
 
+# -----------------------------------------------------------------------------
 if __name__ == "__main__":
     app.run(debug=False, host="0.0.0.0", port=8080)
